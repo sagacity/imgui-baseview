@@ -356,135 +356,139 @@ where
     }
 
     fn on_event(&mut self, _window: &mut Window, event: Event) -> EventStatus {
-        self.sus_context = Some(use_context(
-            self.sus_context.take().unwrap(),
-            |mut context| {
-                let io = context.io_mut();
+        if let Some(ctx) = self.sus_context.take() {
+            self.sus_context = Some(use_context(
+                ctx,
+                |mut context| {
+                    let io = context.io_mut();
 
-                match &event {
-                    baseview::Event::Mouse(event) => match event {
-                        baseview::MouseEvent::CursorMoved { position } => {
-                            let position = scale_pos_from_baseview(
-                                *position,
-                                self.scale_factor,
-                                self.hidpi_mode,
-                                self.hidpi_factor,
-                            );
-                            io.mouse_pos = [position.x as f32, position.y as f32];
-                        }
-                        baseview::MouseEvent::ButtonPressed(button) => match button {
-                            baseview::MouseButton::Left => self.mouse_buttons[0].set(true),
-                            baseview::MouseButton::Middle => self.mouse_buttons[2].set(true),
-                            baseview::MouseButton::Right => self.mouse_buttons[1].set(true),
-                            baseview::MouseButton::Other(3) => self.mouse_buttons[3].set(true),
-                            baseview::MouseButton::Other(4) => self.mouse_buttons[4].set(true),
+                    match &event {
+                        baseview::Event::Mouse(event) => match event {
+                            baseview::MouseEvent::CursorMoved { position } => {
+                                let position = scale_pos_from_baseview(
+                                    *position,
+                                    self.scale_factor,
+                                    self.hidpi_mode,
+                                    self.hidpi_factor,
+                                );
+                                io.mouse_pos = [position.x as f32, position.y as f32];
+                            }
+                            baseview::MouseEvent::ButtonPressed(button) => match button {
+                                baseview::MouseButton::Left => self.mouse_buttons[0].set(true),
+                                baseview::MouseButton::Middle => self.mouse_buttons[2].set(true),
+                                baseview::MouseButton::Right => self.mouse_buttons[1].set(true),
+                                baseview::MouseButton::Other(3) => self.mouse_buttons[3].set(true),
+                                baseview::MouseButton::Other(4) => self.mouse_buttons[4].set(true),
+                                _ => {}
+                            },
+                            baseview::MouseEvent::ButtonReleased(button) => match button {
+                                baseview::MouseButton::Left => self.mouse_buttons[0].set(false),
+                                baseview::MouseButton::Middle => self.mouse_buttons[2].set(false),
+                                baseview::MouseButton::Right => self.mouse_buttons[1].set(false),
+                                baseview::MouseButton::Other(3) => self.mouse_buttons[3].set(false),
+                                baseview::MouseButton::Other(4) => self.mouse_buttons[4].set(false),
+                                _ => {}
+                            },
+                            baseview::MouseEvent::WheelScrolled(scroll_delta) => match scroll_delta {
+                                baseview::ScrollDelta::Lines { x, y } => {
+                                    io.mouse_wheel_h = *x;
+                                    io.mouse_wheel = *y;
+                                }
+                                baseview::ScrollDelta::Pixels { x, y } => {
+                                    if *x < 0.0 {
+                                        io.mouse_wheel_h -= 1.0;
+                                    } else if *x > 1.0 {
+                                        io.mouse_wheel_h += 1.0;
+                                    }
+
+                                    if *y < 0.0 {
+                                        io.mouse_wheel -= 1.0;
+                                    } else if *y > 1.0 {
+                                        io.mouse_wheel_h += 1.0;
+                                    }
+                                }
+                            },
                             _ => {}
                         },
-                        baseview::MouseEvent::ButtonReleased(button) => match button {
-                            baseview::MouseButton::Left => self.mouse_buttons[0].set(false),
-                            baseview::MouseButton::Middle => self.mouse_buttons[2].set(false),
-                            baseview::MouseButton::Right => self.mouse_buttons[1].set(false),
-                            baseview::MouseButton::Other(3) => self.mouse_buttons[3].set(false),
-                            baseview::MouseButton::Other(4) => self.mouse_buttons[4].set(false),
-                            _ => {}
-                        },
-                        baseview::MouseEvent::WheelScrolled(scroll_delta) => match scroll_delta {
-                            baseview::ScrollDelta::Lines { x, y } => {
-                                io.mouse_wheel_h = *x;
-                                io.mouse_wheel = *y;
+                        baseview::Event::Keyboard(event) => {
+                            use keyboard_types::Code;
+
+                            let pressed = event.state == keyboard_types::KeyState::Down;
+
+                            io.keys_down[event.code as usize] = pressed;
+
+                            // This is a bit redundant here, but we'll leave it in. The OS occasionally
+                            // fails to send modifiers keys, but it doesn't seem to send false-positives,
+                            // so double checking isn't terrible in case some system *doesn't* send
+                            // device events sometimes.
+                            match event.code {
+                                Code::ShiftLeft | Code::ShiftRight => io.key_shift = pressed,
+                                Code::ControlLeft | Code::ControlRight => io.key_ctrl = pressed,
+                                Code::AltLeft | Code::AltRight => io.key_alt = pressed,
+                                Code::MetaLeft | Code::MetaRight => io.key_super = pressed,
+                                _ => (),
                             }
-                            baseview::ScrollDelta::Pixels { x, y } => {
-                                if *x < 0.0 {
-                                    io.mouse_wheel_h -= 1.0;
-                                } else if *x > 1.0 {
-                                    io.mouse_wheel_h += 1.0;
-                                }
 
-                                if *y < 0.0 {
-                                    io.mouse_wheel -= 1.0;
-                                } else if *y > 1.0 {
-                                    io.mouse_wheel_h += 1.0;
-                                }
-                            }
-                        },
-                        _ => {}
-                    },
-                    baseview::Event::Keyboard(event) => {
-                        use keyboard_types::Code;
-
-                        let pressed = event.state == keyboard_types::KeyState::Down;
-
-                        io.keys_down[event.code as usize] = pressed;
-
-                        // This is a bit redundant here, but we'll leave it in. The OS occasionally
-                        // fails to send modifiers keys, but it doesn't seem to send false-positives,
-                        // so double checking isn't terrible in case some system *doesn't* send
-                        // device events sometimes.
-                        match event.code {
-                            Code::ShiftLeft | Code::ShiftRight => io.key_shift = pressed,
-                            Code::ControlLeft | Code::ControlRight => io.key_ctrl = pressed,
-                            Code::AltLeft | Code::AltRight => io.key_alt = pressed,
-                            Code::MetaLeft | Code::MetaRight => io.key_super = pressed,
-                            _ => (),
-                        }
-
-                        if pressed {
-                            if let keyboard_types::Key::Character(written) = &event.key {
-                                for chr in written.chars() {
-                                    // Exclude the backspace key ('\u{7f}'). Otherwise we will insert this char and then
-                                    // delete it.
-                                    if chr != '\u{7f}' {
-                                        io.add_input_character(chr)
+                            if pressed {
+                                if let keyboard_types::Key::Character(written) = &event.key {
+                                    for chr in written.chars() {
+                                        // Exclude the backspace key ('\u{7f}'). Otherwise we will insert this char and then
+                                        // delete it.
+                                        if chr != '\u{7f}' {
+                                            io.add_input_character(chr)
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
-                    baseview::Event::Window(event) => {
-                        match event {
-                            baseview::WindowEvent::Resized(window_info) => {
-                                self.scale_factor = match self.scale_policy {
-                                    WindowScalePolicy::ScaleFactor(scale) => scale,
-                                    WindowScalePolicy::SystemScaleFactor => window_info.scale(),
-                                };
+                        baseview::Event::Window(event) => {
+                            match event {
+                                baseview::WindowEvent::Resized(window_info) => {
+                                    self.scale_factor = match self.scale_policy {
+                                        WindowScalePolicy::ScaleFactor(scale) => scale,
+                                        WindowScalePolicy::SystemScaleFactor => window_info.scale(),
+                                    };
 
-                                let new_hidpi_factor = self.hidpi_mode.apply(self.scale_factor);
+                                    let new_hidpi_factor = self.hidpi_mode.apply(self.scale_factor);
 
-                                // Mouse position needs to be changed while we still have both the old and the new
-                                // values
-                                if io.mouse_pos[0].is_finite() && io.mouse_pos[1].is_finite() {
-                                    io.mouse_pos = [
-                                        io.mouse_pos[0]
-                                            * (new_hidpi_factor / self.hidpi_factor) as f32,
-                                        io.mouse_pos[1]
-                                            * (new_hidpi_factor / self.hidpi_factor) as f32,
+                                    // Mouse position needs to be changed while we still have both the old and the new
+                                    // values
+                                    if io.mouse_pos[0].is_finite() && io.mouse_pos[1].is_finite() {
+                                        io.mouse_pos = [
+                                            io.mouse_pos[0]
+                                                * (new_hidpi_factor / self.hidpi_factor) as f32,
+                                            io.mouse_pos[1]
+                                                * (new_hidpi_factor / self.hidpi_factor) as f32,
+                                        ];
+                                    }
+
+                                    self.hidpi_factor = new_hidpi_factor;
+
+                                    let logical_size = [
+                                        (window_info.physical_size().width as f64 / self.hidpi_factor)
+                                            as f32,
+                                        (window_info.physical_size().height as f64 / self.hidpi_factor)
+                                            as f32,
                                     ];
+
+                                    io.display_framebuffer_scale =
+                                        [self.hidpi_factor as f32, self.hidpi_factor as f32];
+                                    io.display_size = logical_size;
                                 }
-
-                                self.hidpi_factor = new_hidpi_factor;
-
-                                let logical_size = [
-                                    (window_info.physical_size().width as f64 / self.hidpi_factor)
-                                        as f32,
-                                    (window_info.physical_size().height as f64 / self.hidpi_factor)
-                                        as f32,
-                                ];
-
-                                io.display_framebuffer_scale =
-                                    [self.hidpi_factor as f32, self.hidpi_factor as f32];
-                                io.display_size = logical_size;
+                                baseview::WindowEvent::WillClose => {}
+                                _ => {}
                             }
-                            baseview::WindowEvent::WillClose => {}
-                            _ => {}
                         }
                     }
-                }
 
-                context.suspend()
-            },
-        ));
+                    context.suspend()
+                },
+            ));
 
-        EventStatus::Captured
+            EventStatus::Captured
+        } else {
+            EventStatus::Ignored
+        }
     }
 }
 
